@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,14 +19,26 @@ import (
 // TimeOut 全局请求超时设置,默认1分钟
 var TimeOut time.Duration = 60 * time.Second
 
+// Proxy 代理
+var Proxy func(*http.Request) (*url.URL, error)
+
 // SetTimeOut 设置全局请求超时
 func SetTimeOut(d time.Duration) {
 	TimeOut = d
 }
 
+// SetProxy 设置全局代理
+func SetProxy(p func(*http.Request) (*url.URL, error)) {
+	Proxy = p
+}
+
 // httpClient() 带超时的http.Client
 func httpClient() *http.Client {
-	return &http.Client{Timeout: TimeOut}
+	cli := &http.Client{Timeout: TimeOut}
+	if Proxy != nil {
+		cli.Transport = &http.Transport{Proxy: Proxy}
+	}
+	return cli
 }
 
 // GetJson 发送GET请求解析json
@@ -76,7 +89,7 @@ func GetBody(uri string) ([]byte, error) {
 // 	return resp.Body, nil
 // }
 
-//PostJson 发送Json格式的POST请求
+// PostJson 发送Json格式的POST请求
 func PostJson(uri string, obj interface{}) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
@@ -97,7 +110,7 @@ func PostJson(uri string, obj interface{}) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
-//PostJsonPtr 发送Json格式的POST请求并解析结果到result指针
+// PostJsonPtr 发送Json格式的POST请求并解析结果到result指针
 func PostJsonPtr(uri string, obj interface{}, result interface{}, contentType ...string) (err error) {
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
@@ -123,7 +136,7 @@ func PostJsonPtr(uri string, obj interface{}, result interface{}, contentType ..
 	return json.NewDecoder(resp.Body).Decode(result)
 }
 
-//PostXmlPtr 发送Xml格式的POST请求并解析结果到result指针
+// PostXmlPtr 发送Xml格式的POST请求并解析结果到result指针
 func PostXmlPtr(uri string, obj interface{}, result interface{}) (err error) {
 	buf := new(bytes.Buffer)
 	enc := xml.NewEncoder(buf)
