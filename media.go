@@ -26,14 +26,15 @@ type Media struct {
 }
 
 // MediaUpload 临时素材上传，mediaType选项如下：
+//
 //	TypeImage  = "image"
 //	TypeVoice  = "voice"
 //	TypeVideo  = "video"
 //	TypeFile   = "file" // 仅企业微信可用
-func (s *Server) MediaUpload(mediaType string, filename string) (media Media, err error) {
+func (s *Server) MediaUpload(mediaType string, filename string, contentType string, data []byte) (media Media, err error) {
 	uri := fmt.Sprintf(s.RootUrl+WXAPIMediaUpload, s.GetAccessToken(), mediaType)
 	var b []byte
-	b, err = util.PostFile("media", filename, uri)
+	b, err = util.PostFileBytes("media", filename, contentType, data, uri)
 	if err != nil {
 		return
 	}

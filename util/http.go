@@ -9,9 +9,9 @@ import (
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -158,13 +158,14 @@ func PostXmlPtr(uri string, obj interface{}, result interface{}) (err error) {
 	return xml.NewDecoder(resp.Body).Decode(result)
 }
 
-// PostFile 上传文件
-func PostFile(fieldname, filename, uri string) ([]byte, error) {
+// PostFileBytes 上传文件
+func PostFileBytes(fieldname string, filename string, contentType string, data []byte, uri string) ([]byte, error) {
 	fields := []MultipartFormField{
 		{
-			IsFile:    true,
-			Fieldname: fieldname,
-			Filename:  filename,
+			Fieldname:   fieldname,
+			Value:       data,
+			ContentType: contentType,
+			Filename:    filename,
 		},
 	}
 	return PostMultipartForm(fields, uri)
@@ -188,10 +189,10 @@ func GetFile(filename, uri string) error {
 
 // MultipartFormField 文件或其他表单数据
 type MultipartFormField struct {
-	IsFile    bool
-	Fieldname string
-	Value     []byte
-	Filename  string
+	Fieldname   string
+	Value       []byte
+	ContentType string
+	Filename    string
 }
 
 // PostMultipartForm 上传文件或其他表单数据
@@ -200,33 +201,17 @@ func PostMultipartForm(fields []MultipartFormField, uri string) (respBody []byte
 	bodyWriter := multipart.NewWriter(bodyBuf)
 
 	for _, field := range fields {
-		if field.IsFile {
-			fileWriter, e := bodyWriter.CreateFormFile(field.Fieldname, filepath.Base(field.Filename))
-			if e != nil {
-				err = fmt.Errorf("error writing to buffer , err=%v", e)
-				return
-			}
-
-			fh, e := os.Open(field.Filename)
-			if e != nil {
-				err = fmt.Errorf("error opening file , err=%v", e)
-				return
-			}
-			defer fh.Close()
-
-			if _, err = io.Copy(fileWriter, fh); err != nil {
-				return
-			}
-		} else {
-			partWriter, e := bodyWriter.CreateFormField(field.Fieldname)
-			if e != nil {
-				err = e
-				return
-			}
-			valueReader := bytes.NewReader(field.Value)
-			if _, err = io.Copy(partWriter, valueReader); err != nil {
-				return
-			}
+		h := make(textproto.MIMEHeader)
+		h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"; filelength=%d`, field.Fieldname, field.Filename, len(field.Value)))
+		h.Set("Content-Type", field.ContentType)
+		partWriter, e := bodyWriter.CreatePart(h)
+		if e != nil {
+			err = e
+			return
+		}
+		valueReader := bytes.NewReader(field.Value)
+		if _, err = io.Copy(partWriter, valueReader); err != nil {
+			return
 		}
 	}
 
